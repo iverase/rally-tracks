@@ -123,7 +123,7 @@
     "aggs": {
        "grid" : {
           "geotile_grid" : {
-              "field": "shape"    
+              "field": "shape",    
               "precision" : 17,
               "size" : 65536,
               "bounds": {
