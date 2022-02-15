@@ -120,7 +120,7 @@
        }
       }
     },
-    "aggs": {
+    "aggregations": {
        "grid" : {
           "geotile_grid" : {
               "field": "shape",    
