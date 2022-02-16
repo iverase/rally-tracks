@@ -38,30 +38,6 @@
     {
       "name": "refresh-after-all-indices",
       "operation": "refresh"
-    },
-    {
-      "operation": "polygon",
-      "warmup-iterations": 200,
-      "iterations": 100,
-      "target-throughput": 0.5
-    },
-    {
-      "operation": "bbox",
-      "warmup-iterations": 200,
-      "iterations": 100,
-      "target-throughput": 1
-    },
-    {
-      "operation": "mvt",
-      "warmup-iterations": 200,
-      "iterations": 100,
-      "target-throughput": 0.5
-    },
-    {
-      "operation": "mvt-grid",
-      "warmup-iterations": 200,
-      "iterations": 100,
-      "target-throughput": 1
     }
   ]
    },
