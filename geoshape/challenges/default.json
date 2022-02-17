@@ -36,6 +36,15 @@
           "index": "osmlinestrings"
         },
         {
+          "name": "force-merge-linestrings",
+          "operation": {
+            "operation-type": "force-merge",
+            "max-num-segments": 1,
+            "index": "osmlinestrings",
+            "request-timeout": 7200
+          }
+        },
+        {
           "name": "wait-until-linestrings-merges-finish",
           "operation": {
             "operation-type": "index-stats",
@@ -58,6 +67,15 @@
           "name": "refresh-after-multilinestrings-index",
           "operation": "refresh",
           "index": "osmmultilinestrings"
+        },
+        {
+          "name": "force-merge-multilinestrings",
+          "operation": {
+            "operation-type": "force-merge",
+            "max-num-segments": 1,
+            "index": "osmmultilinestrings",
+            "request-timeout": 7200
+          }
         },
         {
           "name": "wait-until-multilinestrings-merges-finish",
@@ -84,6 +102,15 @@
           "index": "osmpolygons"
         },
         {
+          "name": "force-merge-polygons",
+          "operation": {
+            "operation-type": "force-merge",
+            "max-num-segments": 1,
+            "index": "osmpolygons",
+            "request-timeout": 7200
+          }
+        },
+        {
           "name": "refresh-after-all-indices",
           "operation": "refresh"
         },
@@ -105,6 +132,24 @@
           "warmup-iterations": 200,
           "iterations": 100,
           "target-throughput": 10
+        },
+        {
+          "operation": "polygon-contains",
+          "warmup-iterations": 200,
+          "iterations": 100,
+          "target-throughput": 10
+        },
+        {
+          "operation": "polygon-disjoint",
+          "warmup-iterations": 200,
+          "iterations": 100,
+          "target-throughput": 5
+        },
+        {
+          "operation": "polygon-within",
+          "warmup-iterations": 200,
+          "iterations": 100,
+          "target-throughput": 1
         },
         {
           "operation": "bbox",
