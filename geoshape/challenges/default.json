@@ -128,22 +128,22 @@
           }
         },
         {
-          "operation": "polygon",
+          "operation": "polygon-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 10
+          "target-throughput": 4
         },
         {
           "operation": "polygon-contains",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 10
+          "target-throughput": 4
         },
         {
           "operation": "polygon-disjoint",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 4
         },
         {
           "operation": "polygon-within",
@@ -152,22 +152,22 @@
           "target-throughput": 1
         },
         {
-          "operation": "bbox",
+          "operation": "bbox-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 15
+          "target-throughput": 5
         },
         {
           "operation": "bbox-contains",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 15
+          "target-throughput": 5
         },
         {
           "operation": "bbox-disjoint",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 10
+          "target-throughput": 5
         },
         {
           "operation": "bbox-within",
@@ -176,16 +176,16 @@
           "target-throughput": 1
         },        
         {
-          "operation": "mvt",
+          "operation": "mvt-hits",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 0.5
         },
         {
           "operation": "mvt-grid",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 1
         }
       ]
     },
@@ -319,19 +319,19 @@
           }
         },
         {
-          "operation": "polygon",
+          "operation": "polygon-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
           "target-throughput": 0.3
         },
         {
-          "operation": "bbox",
+          "operation": "bbox-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
           "target-throughput": 0.25
         },
         {
-          "operation": "mvt",
+          "operation": "mvt-hits",
           "warmup-iterations": 200,
           "iterations": 100,
           "target-throughput": 0.25

@@ -41,7 +41,7 @@
     "corpora": "default-polygons"
     },            
     {
-      "name": "polygon",
+      "name": "polygon-intersects",
       "operation-type": "search",
       "index": "osm*",
       "body": {
@@ -140,7 +140,7 @@
       }
     },   
     {
-      "name": "bbox",
+      "name": "bbox-intersects",
       "operation-type": "search",
       "index": "osm*",
       "body": {
@@ -211,7 +211,7 @@
       }
     },            
     {
-      "name": "mvt",
+      "name": "mvt-hits",
       "operation-type": "search",
       "index": "osm*",
       "body": {
