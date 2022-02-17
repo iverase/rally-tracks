@@ -81,6 +81,60 @@
         }
       }
     },
+   {
+      "name": "bbox-contains", 
+      "operation-type": "search",
+      "index": "osm*",
+      "body": {
+        "query": {
+          "geo_shape": {
+            "shape": {
+              "shape": {
+                "type": "envelope",
+                "coordinates" : [[-0.1, 61.0], [15.0, 48.0]]
+              },
+              "relation": "contains"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "bbox-disjoint",
+      "operation-type": "search",
+      "index": "osm*",
+      "body": {
+        "query": {
+          "geo_shape": {
+            "shape": {
+              "shape": {
+                "type": "envelope",
+                "coordinates" : [[-0.1, 61.0], [15.0, 48.0]]
+                },
+                "relation": "disjoint"
+              }
+            }
+          }
+        }
+    },
+    {
+      "name": "bbox-within",
+      "operation-type": "search",
+      "index": "osm*",
+      "body": {
+        "query": {
+          "geo_shape": {
+          "shape": {
+            "shape": {
+              "type": "envelope",
+              "coordinates" : [[-0.1, 61.0], [15.0, 48.0]]
+              },
+              "relation": "within"
+            }
+         }
+        }
+      }
+    },            
     {
       "name": "mvt",
       "operation-type": "search",
