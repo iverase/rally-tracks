@@ -131,43 +131,43 @@
           "operation": "polygon-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 4
+          "target-throughput": 3.3
         },
         {
           "operation": "polygon-contains",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 4
+          "target-throughput": 3.3
         },
         {
           "operation": "polygon-disjoint",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 4
+          "target-throughput": 3.3
         },
         {
           "operation": "polygon-within",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 1
+          "target-throughput": 0.9
         },
         {
           "operation": "bbox-intersects",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 3.7
         },
         {
           "operation": "bbox-contains",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 3
         },
         {
           "operation": "bbox-disjoint",
           "warmup-iterations": 200,
           "iterations": 100,
-          "target-throughput": 5
+          "target-throughput": 4
         },
         {
           "operation": "bbox-within",
