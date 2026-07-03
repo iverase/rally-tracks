@@ -7,19 +7,95 @@ import random
 import re
 import statistics
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, Final, List, Optional
 
 from esrally.driver import runner
 from esrally.track.params import BulkIndexParamSource
 
 logger = logging.getLogger(__name__)
 
-Qrels = Dict[str, Dict[str, int]]
-Results = Dict[str, Dict[str, float]]
-
 QUERIES_FILENAME: str = "queries.json.bz2"
 QUERIES_RECALL_FILENAME: str = "queries-recall.json.bz2"
 QUERIES_RECALL_10M_FILENAME: str = "queries-recall-10m.json.bz2"
+
+SLICE_MAX: Final[int] = 9999
+
+
+def slice_enabled(params) -> bool:
+    return params.get("slice_enabled", True)
+
+
+def random_slice_request_params(params) -> dict[str, str]:
+    if not slice_enabled(params):
+        return {}
+    return {"_slice": str(random.randint(0, SLICE_MAX))}
+
+
+class BulkSliceParamSource:
+    # Wraps Rally's standard bulk param source and adds a random `_slice` value
+    # (string from "0" to "9999") to each bulk action line. Required when
+    # index.slice.enabled is true.
+
+    def __init__(self, track, params, **kwargs):
+        self._inner = BulkIndexParamSource(track, params, **kwargs)
+        self.infinite = self._inner.infinite
+        self._seed = params.get("slice-random-seed", 42)
+
+    def partition(self, partition_index, total_partitions):
+        return _SliceRewritingPartition(
+            self._inner.partition(partition_index, total_partitions),
+            random.Random(self._seed + partition_index),
+        )
+
+
+class _SliceRewritingPartition:
+    def __init__(self, inner, rng):
+        self._inner = inner
+        self._rng = rng
+        self.infinite = inner.infinite
+
+    @property
+    def percent_completed(self):
+        return self._inner.percent_completed
+
+    def partition(self, partition_index, total_partitions):
+        return self
+
+    def params(self):
+        p = self._inner.params()
+        body = p["body"]
+        body_was_str = isinstance(body, str)
+        body_bytes = body.encode("utf-8") if body_was_str else body
+        new_body = self._rewrite_body(body_bytes)
+        p["body"] = new_body.decode("utf-8") if body_was_str else new_body
+        return p
+
+    def _rewrite_body(self, body_bytes):
+        lines = body_bytes.split(b"\n")
+        out = []
+        i = 0
+        n = len(lines)
+        while i < n:
+            line = lines[i]
+            if not line:
+                i += 1
+                continue
+            if i + 1 >= n:
+                out.append(line)
+                break
+            doc_line = lines[i + 1]
+            i += 2
+            action = json.loads(line)
+            verb = next(iter(action))
+            action[verb]["_slice"] = str(self._rng.randint(0, SLICE_MAX))
+            out.append(json.dumps(action, separators=(",", ":")).encode("utf-8"))
+            out.append(doc_line)
+        out.append(b"")
+        return b"\n".join(out)
+
+
+Qrels = Dict[str, Dict[str, int]]
+Results = Dict[str, Dict[str, float]]
 
 
 def extract_vector_operations_count(knn_result):
@@ -154,6 +230,11 @@ class KnnParamSource:
         self._iters += 1
         if self._iters >= self._maxIters:
             self._iters = 0
+
+        request_params = random_slice_request_params(self._params)
+        if request_params:
+            result["request-params"] = request_params
+
         return result
 
 
@@ -181,6 +262,7 @@ class KnnRecallParamSource:
             "visit_percentage": self._params.get("visit-percentage", -1),
             "oversample_rescore": self._params.get("oversample-rescore", -1),
             "recall_doc_set": self._params.get("recall-doc-set", -1),
+            "slice_enabled": slice_enabled(self._params),
         }
 
 
@@ -212,6 +294,7 @@ class KnnRecallRunner:
             for line in queries_file:
                 query = json.loads(line)
                 query_id = query["query_id"]
+                request_params = random_slice_request_params({"slice_enabled": params.get("slice_enabled", True)})
 
                 if visit_percentage is not None and visit_percentage > 0:
                     knn_query = {"field": "emb", "query_vector": query["emb"], "k": top_k, "visit_percentage": visit_percentage}
@@ -225,7 +308,16 @@ class KnnRecallRunner:
                     "fields": ["docid"],
                     "profile": True,
                 }
-                knn_result = await es.search(index=index, request_cache=request_cache, size=top_k, body=body)
+                knn_result = await es.perform_request(
+                    method="GET",
+                    path=f"/{index}/_search",
+                    params={
+                        **request_params,
+                        "request_cache": str(request_cache).lower(),
+                        "size": str(top_k),
+                    },
+                    body=body,
+                )
                 knn_hits = []
                 for hit in knn_result["hits"]["hits"]:
                     doc_id = hit["fields"]["docid"][0]
@@ -248,8 +340,8 @@ class KnnRecallRunner:
             {
                 f"best_ndcg_{top_k}": best_relevance_res[f"ndcg_cut@{top_k}"],
                 f"ndcg_{top_k}": relevance_res[f"ndcg_cut@{top_k}"],
-                "avg_recall": recall_total / exact_total,
-                "min_recall": min_recall,
+                "avg_recall": recall_total / exact_total if exact_total else 0,
+                "min_recall": min_recall if exact_total else 0,
                 "k": top_k,
                 "num_candidates": num_candidates,
                 "visit_percentage": visit_percentage,
@@ -314,7 +406,7 @@ class HybridParamSource:
             "standard": {"query": {"bool": {"should": [{"match": {"title": query["text"]}}, {"match": {"text": query["text"]}}]}}}
         }
 
-        return {
+        result = {
             "index": self._index_name,
             "body": {
                 "_source": self._source,
@@ -322,6 +414,10 @@ class HybridParamSource:
                 "size": self._size,
             },
         }
+        request_params = random_slice_request_params(self._params)
+        if request_params:
+            result["request-params"] = request_params
+        return result
 
 
 class EsqlHybridParamSource:
@@ -390,7 +486,11 @@ class EsqlHybridParamSource:
         query_vector = query["emb"]
         query_text = query["text"]
         params = [{"query_vector": query_vector}, {"query_text": query_text}]
-        return {"query": hybrid_query, "body": {"params": params}}
+        result = {"query": hybrid_query, "body": {"params": params}}
+        request_params = random_slice_request_params(self._params)
+        if request_params:
+            result["request-params"] = request_params
+        return result
 
 
 class BulkCopyDocIdParamSource:
@@ -406,9 +506,20 @@ class BulkCopyDocIdParamSource:
     def __init__(self, track, params, **kwargs):
         self._inner = BulkIndexParamSource(track, params, **kwargs)
         self.infinite = self._inner.infinite
+        self._params = params
+        self._seed = params.get("slice-random-seed", 42)
 
     def partition(self, partition_index, total_partitions):
-        return _DocIdRewritingPartition(self._inner.partition(partition_index, total_partitions), self._DOCID_RE)
+        partition = _DocIdRewritingPartition(
+            self._inner.partition(partition_index, total_partitions),
+            self._DOCID_RE,
+        )
+        if slice_enabled(self._params):
+            partition = _SliceRewritingPartition(
+                partition,
+                random.Random(self._seed + partition_index),
+            )
+        return partition
 
 
 class _DocIdRewritingPartition:
@@ -535,6 +646,7 @@ class ConfigureSettingsRunner(runner.Runner):
 
 
 def register(registry):
+    registry.register_param_source("bulk-slice-param-source", BulkSliceParamSource)
     registry.register_param_source("knn-param-source", KnnParamSource)
     registry.register_param_source("knn-recall-param-source", KnnRecallParamSource)
     registry.register_param_source("hybrid-bm25-knn-param-source", HybridParamSource)

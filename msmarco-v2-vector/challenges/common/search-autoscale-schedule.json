@@ -21,6 +21,7 @@
   "clients": {{ initial_ingest_clients | default(4) | int}},
   "operation": {
     "operation-type": "bulk",
+    "param-source": "bulk-slice-param-source",
     "bulk-size": {{ initial_ingest_bulk_size | default(500) | int}},
     "corpora":  [
       {% for doc_id in p_corpora %}

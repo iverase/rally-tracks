@@ -33,6 +33,7 @@
       "tags": ["index"],
       "operation": {
         "operation-type": "bulk",
+        "param-source": "bulk-slice-param-source",
         "bulk-size": {{bulk_size | default(500)}},
         "ingest-percentage": {{ingest_percentage | default(100)}},
         "corpora": {{corpora | default("so_vector_float") | tojson }}

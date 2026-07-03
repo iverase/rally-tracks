@@ -38,6 +38,10 @@
       {% endif %}
       {# non-serverless-index-settings-marker-end #}
       {% endif %}
+      {% if slice_enabled | default(true) %}
+      {{comma()}}
+      "slice.enabled": true
+      {% endif %}
     }
   },
   "mappings": {
@@ -53,7 +57,7 @@
         "index": true,
         "similarity": "dot_product",
         "index_options": {
-          "type": {{ vector_index_type | default("bbq_hnsw") | tojson }}
+          "type": {{ vector_index_type | default("bbq_disk") | tojson }}
           {%- if hnsw_m is defined %},
           "m": {{ hnsw_m }}
           {%- endif %}

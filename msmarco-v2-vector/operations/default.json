@@ -15,6 +15,7 @@
 {
   "name": "initial-documents-indexing",
   "operation-type": "bulk",
+  "param-source": "bulk-slice-param-source",
   "corpora":  [
     {% for doc_id in p_corpora %}
        {{doc_id | tojson}}
@@ -30,6 +31,7 @@
 {
   "name": "parallel-documents-indexing",
   "operation-type": "bulk",
+  "param-source": "bulk-slice-param-source",
   "corpora": {{parallel_corpora | default("msmarco-v2_float-parallel-indexing") | tojson }},
   "bulk-size": {{parallel_indexing_bulk_size | default(50)}},
   "ingest-percentage": {{parallel_indexing_ingest_percentage | default(100)}}

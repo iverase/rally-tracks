@@ -2,9 +2,11 @@ import bz2
 import json
 import logging
 import os
+import random
 from typing import Any, Final, List, Optional
 
 from esrally.driver import runner
+from esrally.track.params import BulkIndexParamSource
 
 logger = logging.getLogger(__name__)
 QUERIES_FILENAME: str = "queries.json.bz2"
@@ -13,9 +15,91 @@ QUERIES_FILENAME_1K: str = "queries-1k.json.bz2"
 TRUE_KNN_FILENAME_1K: str = "queries-recall-1k.json.bz2"
 
 DEFAULT_K: Final[int] = 10
+SLICE_MAX: Final[int] = 9999
 
 
-async def extract_exact_neighbors(query_vector: List[float], index: str, max_size: int, vector_field: str, filter, client) -> List[str]:
+def slice_enabled(params) -> bool:
+    return params.get("slice_enabled", True)
+
+
+def random_slice_request_params(params) -> dict[str, str]:
+    if not slice_enabled(params):
+        return {}
+    return {"_slice": str(random.randint(0, SLICE_MAX))}
+
+
+class BulkSliceParamSource:
+    # Wraps Rally's standard bulk param source and adds a random `_slice` value
+    # (string from "0" to "9999") to each bulk action line. Required when
+    # index.slice.enabled is true.
+
+    def __init__(self, track, params, **kwargs):
+        self._inner = BulkIndexParamSource(track, params, **kwargs)
+        self.infinite = self._inner.infinite
+        self._seed = params.get("slice-random-seed", 42)
+
+    def partition(self, partition_index, total_partitions):
+        return _SliceRewritingPartition(
+            self._inner.partition(partition_index, total_partitions),
+            random.Random(self._seed + partition_index),
+        )
+
+
+class _SliceRewritingPartition:
+    def __init__(self, inner, rng):
+        self._inner = inner
+        self._rng = rng
+        self.infinite = inner.infinite
+
+    @property
+    def percent_completed(self):
+        return self._inner.percent_completed
+
+    def partition(self, partition_index, total_partitions):
+        return self
+
+    def params(self):
+        p = self._inner.params()
+        body = p["body"]
+        body_was_str = isinstance(body, str)
+        body_bytes = body.encode("utf-8") if body_was_str else body
+        new_body = self._rewrite_body(body_bytes)
+        p["body"] = new_body.decode("utf-8") if body_was_str else new_body
+        return p
+
+    def _rewrite_body(self, body_bytes):
+        lines = body_bytes.split(b"\n")
+        out = []
+        i = 0
+        n = len(lines)
+        while i < n:
+            line = lines[i]
+            if not line:
+                i += 1
+                continue
+            if i + 1 >= n:
+                out.append(line)
+                break
+            doc_line = lines[i + 1]
+            i += 2
+            action = json.loads(line)
+            verb = next(iter(action))
+            action[verb]["_slice"] = str(self._rng.randint(0, SLICE_MAX))
+            out.append(json.dumps(action, separators=(",", ":")).encode("utf-8"))
+            out.append(doc_line)
+        out.append(b"")
+        return b"\n".join(out)
+
+
+async def extract_exact_neighbors(
+    query_vector: List[float],
+    index: str,
+    max_size: int,
+    vector_field: str,
+    filter,
+    client,
+    request_params: Optional[dict[str, str]] = None,
+) -> List[str]:
     if filter is None:
         raise ValueError("Filter must be provided for exact neighbors extraction.")
     script_query = {
@@ -31,13 +115,18 @@ async def extract_exact_neighbors(query_vector: List[float], index: str, max_siz
         "_source": False,
         "docvalue_fields": ["questionId"],
     }
-    script_result = await client.search(
+    script_result = await client.perform_request(
+        method="GET",
+        path=f"/{index}/_search",
+        params={
+            **(request_params or {}),
+            "request_cache": "true",
+            "size": str(max_size),
+        },
         body=script_query,
-        index=index,
-        request_cache=True,
-        size=max_size,
     )
-    return [hit["fields"]["questionId"][0] for hit in script_result["hits"]["hits"]]
+    hits = script_result["hits"]["hits"]
+    return [hit["fields"]["questionId"][0] for hit in hits]
 
 
 def compute_percentile(data: List[Any], percentile):
@@ -121,6 +210,10 @@ class KnnParamSource:
             if oversample > -1:
                 result["body"]["knn"]["rescore_vector"] = {"oversample": oversample}
 
+        request_params = random_slice_request_params(self._params)
+        if request_params:
+            result["request-params"] = request_params
+
         return result
 
 
@@ -160,7 +253,11 @@ class ESQLKnnParamSource(KnnParamSource):
                 query += " and (" + self._params["filter"] + ")"
             query += f"| KEEP _id, _score, _source | SORT _score desc | LIMIT {k}"
 
-        return {"query": query, "body": {"params": [{"query": query_vec}]}}
+        result = {"query": query, "body": {"params": [{"query": query_vec}]}}
+        request_params = random_slice_request_params(self._params)
+        if request_params:
+            result["request-params"] = request_params
+        return result
 
 
 class KnnVectorStore:
@@ -178,7 +275,7 @@ class KnnVectorStore:
     def get_query_vectors(self) -> List[List[float]]:
         return self._queries
 
-    async def get_neighbors_for_query(self, index: str, query_id: int, size: int, filter, client) -> List[str]:
+    async def get_neighbors_for_query(self, index: str, query_id: int, size: int, filter, client, request_params=None) -> List[str]:
         # For now, we must calculate the exact neighbors, maybe we should cache this?
         # it would have to be cached per query and filter
         if filter is not None:
@@ -190,6 +287,7 @@ class KnnVectorStore:
                 vector_field="titleVector",
                 filter=filter,
                 client=client,
+                request_params=request_params,
             )
             return extracted
         if (query_id < 0) or (query_id >= len(self._query_nearest_neighbor_docids)):
@@ -226,6 +324,7 @@ class KnnRecallParamSource:
             "oversample": self._params.get("oversample", -1),
             "knn_vector_store": KnnVectorStore(),
             "filter": self._params.get("filter", None),
+            "slice_enabled": slice_enabled(self._params),
             **optional_params,
         }
 
@@ -262,25 +361,33 @@ class KnnRecallRunner:
             es = es.options(request_timeout=request_timeout)
 
         knn_vector_store: KnnVectorStore = params["knn_vector_store"]
+        recall_params = {"slice_enabled": params.get("slice_enabled", True)}
         for query_id, query_vector in enumerate(knn_vector_store.get_query_vectors()):
+            request_params = random_slice_request_params(recall_params)
             knn_body = self.get_knn_query(query_vector, k, num_candidates, filter, params["oversample"])
-            knn_result = await es.search(
+            knn_result = await es.perform_request(
+                method="GET",
+                path=f"/{index}/_search",
+                params={
+                    **request_params,
+                    "request_cache": str(request_cache).lower(),
+                    "size": str(k),
+                },
                 body=knn_body,
-                index=index,
-                request_cache=request_cache,
-                size=k,
             )
             knn_hits = [hit["fields"]["questionId"][0] for hit in knn_result["hits"]["hits"]]
-            true_neighbors = await knn_vector_store.get_neighbors_for_query(index, query_id, k, filter, es)
+            true_neighbors = await knn_vector_store.get_neighbors_for_query(
+                index, query_id, k, filter, es, request_params=request_params
+            )
             current_recall = len(set(knn_hits).intersection(set(true_neighbors)))
             recall_total += current_recall
             exact_total += len(true_neighbors)
             min_recall = min(min_recall, current_recall)
             max_recall = max(max_recall, current_recall)
         to_return = {
-            "avg_recall": recall_total / exact_total,
-            "min_recall": min_recall,
-            "max_recall": max_recall,
+            "avg_recall": recall_total / exact_total if exact_total else 0,
+            "min_recall": min_recall if exact_total else 0,
+            "max_recall": max_recall if exact_total else 0,
             "k": k,
             "num_candidates": num_candidates,
             "oversample": params["oversample"],
@@ -294,6 +401,7 @@ class KnnRecallRunner:
 
 
 def register(registry):
+    registry.register_param_source("bulk-slice-param-source", BulkSliceParamSource)
     registry.register_param_source("knn-param-source", KnnParamSource)
     registry.register_param_source("esql-knn-param-source", ESQLKnnParamSource)
     registry.register_param_source("knn-recall-param-source", KnnRecallParamSource)

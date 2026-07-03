@@ -19,6 +19,7 @@
   "clients": {{ initial_ingest_clients | default(4) | int}},
   "operation": {
     "operation-type": "bulk",
+    "param-source": "bulk-slice-param-source",
     "bulk-size": {{ initial_ingest_bulk_size | default(100) | int}},
     "ingest-percentage": {{initial_ingest_percentage | default(100) | int}}
   }
@@ -64,6 +65,7 @@
         "clients": {{p_as_ingest_clients[i % (p_as_ingest_clients|length)]}},
         "operation": {
           "operation-type": "bulk",
+          "param-source": "bulk-slice-param-source",
           "bulk-size": {{p_ingest_bulk_size}},
           "looped": true
         },
@@ -76,6 +78,7 @@
     "clients": {{p_as_ingest_clients[i % (p_as_ingest_clients|length)]}},
     "operation": {
       "operation-type": "bulk",
+      "param-source": "bulk-slice-param-source",
       "bulk-size": {{p_ingest_bulk_size}},
       "looped": true
     },

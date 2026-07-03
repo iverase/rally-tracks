@@ -24,7 +24,9 @@ Each post is formatted into a JSON document with the following fields:
   tags:	            an array of tags describing the topics
   body:             field containing the text of the question or answer
 
-Fields that do not have values have been left out. The body text was extracted
+Fields that do not have values have been left out. During bulk indexing, Rally adds a
+random `_slice` value to each bulk action line via the `bulk-slice-param-source` (required
+when `index.slice.enabled` is true). The body text was extracted
 and formatted to fit into JSON documents.
 
 ### Generating the dataset
@@ -71,7 +73,7 @@ This track accepts the following parameters with Rally 0.8.0+ using `--track-par
 * `force_merge_timeout` (default: 7200) : How long force merge should be allowed to run before aborting.
 * `include_non_serverless_index_settings` (default: true for non-serverless clusters, false for serverless clusters): Whether to include non-serverless index settings.
 * `include_force_merge` (default: true for non-serverless clusters, false for serverless clusters): Whether to include force merge operation.
-* `vector_index_type` (default: "bbq_hnsw"): The index kind for storing the vectors.
+* `vector_index_type` (default: "bbq_disk"): The index kind for storing the vectors.
 * `corpora` (default: "so_vector_float"): The dataset to use. The default data set represents vectors as float arrays. Use "so_vector_base64" for the same dataset with vectors encoded as base64 strings.
 * `warmup_iterations` (default: 100) - Number of iterations that each client should execute to warmup the benchmark candidate.
 * `iterations` (default: 100) - Number of measurement iterations that each client executes.
@@ -80,6 +82,8 @@ This track accepts the following parameters with Rally 0.8.0+ using `--track-par
 * `vector_index_element_type` (default: "float"): Sets the dense_vector element type.
 * `enable_experimental_features` (default: false): Enables experimental dense vector features that may break backward compatibility.
 * `index_mode` (default: not set, uses "standard"): If defined, sets the index mode (e.g., "vectordb_document").
+* `slice_enabled` (default: true): Enables `index.slice.enabled` on the index, adds a random `_slice` value to each bulk action line during indexing, and passes a random `_slice` URL parameter on every search query (e.g. `/_search?_slice=4821`).
+* `slice-random-seed` (default: 42): Base random seed for `_slice` assignment during bulk indexing; each bulk indexing client uses `slice-random-seed + client_index`.
 
 ### License
 We use the same license for the data as the original data: [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/).

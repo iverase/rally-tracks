@@ -15,6 +15,10 @@
     "index.dense_vector.experimental_features": true{% endif %}
       {% endif %}
     {%- endif -%}{# non-serverless-index-settings-marker-end #}
+    {% if slice_enabled | default(true) %}
+    {{comma()}}
+    "index.slice.enabled": true
+    {% endif %}
   },
   "mappings": {
     "properties": {
@@ -40,7 +44,7 @@
         "index" : true,
         "similarity": "dot_product",
         "index_options": {
-          "type": {{ vector_index_type | default("bbq_hnsw") | tojson }},
+          "type": {{ vector_index_type | default("bbq_disk") | tojson }},
           "on_disk_rescore": {{ vector_index_on_disk_rescore | default(false) | tojson }}
         }
       },

@@ -25,6 +25,10 @@
     {% endif %}
     {%- endif -%}
     {# non-serverless-index-settings-marker-end #}
+    {% if slice_enabled | default(true) %}
+    {{comma()}}
+    "index.slice.enabled": true
+    {% endif %}
   },
   "mappings": {
     "properties": {

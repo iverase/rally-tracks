@@ -65,7 +65,7 @@ $ python _tools/parse_queries.py -r
 
 This track accepts the following parameters with Rally 0.8.0+ using `--track-params`:
  - `base_url` (default: `https://rally-tracks.elastic.co/cohere-msmarco-v2-embed-english-v3`): Specifies the bucket path from where to download the data set.
- - `vector_index_type` (default: bbq_hnsw)
+ - `vector_index_type` (default: bbq_disk)
  - `hnsw_m` (default: unset): The number of neighbors each node will be connected to in the HNSW graph.
  - `hnsw_ef_construction` (default: unset): The number of candidates to track while assembling the HNSW graph.
  - `aggressive_merge_policy` (default: false): Whether to apply a more aggressive merge strategy.
@@ -97,6 +97,8 @@ This track accepts the following parameters with Rally 0.8.0+ using `--track-par
  - `enable_experimental_features` (default: false): Enables experimental dense vector features that may break backward compatibility.
  - `index_mode` (default: not set, uses "standard"): If defined, sets the index mode (e.g., "vectordb_document").
  - `include_non_serverless_index_settings` (default: true for non-serverless clusters, false for serverless clusters): Whether to include non-serverless index settings.
+ - `slice_enabled` (default: true): Enables `index.slice.enabled` on the index, adds a random `_slice` value to each bulk action line during indexing, and passes a random `_slice` URL parameter on every search query (e.g. `/_search?_slice=4821`).
+ - `slice-random-seed` (default: 42): Base random seed for `_slice` assignment during bulk indexing; each bulk indexing client uses `slice-random-seed + client_index`.
 
 For running with Base64 encoded strings, use a parameter file like:
 
@@ -210,7 +212,7 @@ When `as_search_target_throughputs` is a positive number, the search throughput 
 
 Initial ingest, wait for merges to settle, then run a single parallel phase that updates a percentage of the corpus (by re-indexing documents with the same `_id` from the same corpus) at a target docs/s while running queries. The search task runs until the update task completes (via `completed-by`).
 
-Both bulk tasks use the `bulk-copy-docid-param-source` from `track.py`, which copies each document's `docid` field into the bulk action line as `_id`. The corpus is not rewritten — the `docid` value is left in place as a field and also used as the document `_id`, so re-ingestion overwrites existing documents instead of appending new ones with fresh auto-generated `_id`s.
+Both bulk tasks use the `bulk-copy-docid-param-source` from `track.py`, which copies each document's `docid` field into the bulk action line as `_id`. When `slice_enabled` is true, a random `_slice` value is also added to each bulk action line. The corpus is not rewritten — the `docid` value is left in place as a field and also used as the document `_id`, so re-ingestion overwrites existing documents instead of appending new ones with fresh auto-generated `_id`s.
 
 - Mapping:
     - `vector_index_type` (default: bbq_hnsw)
