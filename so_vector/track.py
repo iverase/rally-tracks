@@ -35,6 +35,7 @@ class BulkSliceParamSource:
 
     def __init__(self, track, params, **kwargs):
         self._inner = BulkIndexParamSource(track, params, **kwargs)
+        self.corpora = self._inner.corpora
         self.infinite = self._inner.infinite
         self._seed = params.get("slice-random-seed", 42)
 
