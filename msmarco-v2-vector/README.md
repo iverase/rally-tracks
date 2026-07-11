@@ -95,7 +95,7 @@ This track accepts the following parameters with Rally 0.8.0+ using `--track-par
  - `vector_index_type` (default: "int8_hnsw"): The index kind for storing the vectors.
  - `vector_index_element_type` (default: "float"): Sets the dense_vector element type.
  - `enable_experimental_features` (default: false): Enables experimental dense vector features that may break backward compatibility.
- - `index_mode` (default: not set, uses "standard"): If defined, sets the index mode (e.g., "vectordb_document").
+ - `index_mode` (default: `vectordb_document`): Sets `index.mode` on the index (e.g. `vectordb_document` or `standard`). Override via `--track-params` to use a different mode.
  - `include_non_serverless_index_settings` (default: true for non-serverless clusters, false for serverless clusters): Whether to include non-serverless index settings.
  - `slice_enabled` (default: true): Enables `index.slice.enabled` on the index, adds a random `_slice` value to each bulk action line during indexing, and passes a random `_slice` URL parameter on every search query (e.g. `/_search?_slice=4821`).
  - `slice-random-seed` (default: 42): Base random seed for `_slice` assignment during bulk indexing; each bulk indexing client uses `slice-random-seed + client_index`.

@@ -1,5 +1,6 @@
 {% import "rally.helpers" as rally with context %}
 {% set _base_url = (base_url | default("https://rally-tracks.elastic.co/cohere-msmarco-v2-embed-english-v3")) %}
+{% set p_index_mode = (index_mode | default("vectordb_document")) %}
 {
   "version": 2,
   "description": "Benchmark for vector search with msmarco-v2 passage data",

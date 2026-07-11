@@ -1,48 +1,41 @@
 {% set p_include_non_serverless_index_settings = (include_non_serverless_index_settings | default(build_flavor != "serverless")) %}
+{% set p_index_mode = (index_mode | default("vectordb_document")) %}
 
 {
 {%- set comma = joiner(",") -%}
   "settings": {
-    "index": {
-      {% if index_mode is defined %}
-      {{comma()}}
-      "mode": {{ index_mode | tojson }}
-      {% endif %}
-      {# non-serverless-index-settings-marker-start #}{%- if build_flavor != "serverless" or serverless_operator == true -%}
-      {%- if index_refresh_interval is defined %}
-      {{comma()}}
-      "refresh_interval": {{ index_refresh_interval | tojson }}
-      {%- endif %}
-      {% if preload_pagecache %}
-      {{comma()}}
-      "store.preload": [ "vec", "vex", "vem"]
-      {% endif %}
-      {% if p_include_non_serverless_index_settings %}
-      {{comma()}}
-      "number_of_shards": {{number_of_shards | default(1)}},
-      "number_of_replicas": {{number_of_replicas | default(0)}},
-      "merge.scheduler.auto_throttle": {{ index_merge_scheduler_auto_throttle | default(true) | tojson }}
-      {% endif %}
-      {% if enable_experimental_features | default(false) %}
-      {{comma()}}
-      "dense_vector.experimental_features": true{% endif %}
-      {% if aggressive_merge_policy %}
-      {{comma()}}
-      "merge": {
-        "policy": {
-          "max_merged_segment": "25gb",
-          "floor_segment": "1gb",
-          "segments_per_tier": 5
-        }
-      }
-      {% endif %}
-      {# non-serverless-index-settings-marker-end #}
-      {% endif %}
-      {% if slice_enabled | default(true) %}
-      {{comma()}}
-      "slice.enabled": true
-      {% endif %}
-    }
+    {{comma()}}
+    "index.mode": {{ p_index_mode | tojson }},
+    {# non-serverless-index-settings-marker-start #}{%- if build_flavor != "serverless" or serverless_operator == true -%}
+    {%- if index_refresh_interval is defined %}
+    {{comma()}}
+    "index.refresh_interval": {{ index_refresh_interval | tojson }}
+    {%- endif %}
+    {% if preload_pagecache %}
+    {{comma()}}
+    "index.store.preload": [ "vec", "vex", "vem"]
+    {% endif %}
+    {% if p_include_non_serverless_index_settings %}
+    {{comma()}}
+    "index.number_of_shards": {{number_of_shards | default(1)}},
+    "index.number_of_replicas": {{number_of_replicas | default(0)}},
+    "index.merge.scheduler.auto_throttle": {{ index_merge_scheduler_auto_throttle | default(true) | tojson }}
+    {% endif %}
+    {% if enable_experimental_features | default(false) %}
+    {{comma()}}
+    "index.dense_vector.experimental_features": true
+    {% endif %}
+    {% if aggressive_merge_policy %}
+    {{comma()}}
+    "index.merge.policy.max_merged_segment": "25gb",
+    "index.merge.policy.floor_segment": "1gb",
+    "index.merge.policy.segments_per_tier": 5
+    {% endif %}
+    {%- endif -%}{# non-serverless-index-settings-marker-end #}
+    {% if slice_enabled | default(true) %}
+    {{comma()}}
+    "index.slice.enabled": true
+    {% endif %}
   },
   "mappings": {
     "dynamic": false,
