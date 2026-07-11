@@ -5,7 +5,7 @@
 {%- set comma = joiner(",") -%}
   "settings": {
     {{comma()}}
-    "index.mode": {{ p_index_mode | tojson }},
+    "index.mode": {{ p_index_mode | tojson }}
     {# non-serverless-index-settings-marker-start #}
     {%- if build_flavor != "serverless" or serverless_operator == true -%}
     {% if preload_pagecache %}
