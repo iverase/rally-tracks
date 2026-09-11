@@ -97,8 +97,9 @@ This track accepts the following parameters with Rally 0.8.0+ using `--track-par
  - `enable_experimental_features` (default: false): Enables experimental dense vector features that may break backward compatibility.
  - `index_mode` (default: `vectordb_document`): Sets `index.mode` on the index (e.g. `vectordb_document` or `standard`). Override via `--track-params` to use a different mode.
  - `include_non_serverless_index_settings` (default: true for non-serverless clusters, false for serverless clusters): Whether to include non-serverless index settings.
- - `slice_enabled` (default: true): Enables `index.slice.enabled` on the index, adds a random `_slice` value to each bulk action line during indexing, and passes a random `_slice` URL parameter on every search query (e.g. `/_search?_slice=4821`).
- - `slice-random-seed` (default: 42): Base random seed for `_slice` assignment during bulk indexing; each bulk indexing client uses `slice-random-seed + client_index`.
+ - `slice_enabled` (default: true): Enables `index.slice.enabled` on the index, adds a random `slice` value to each bulk action line during indexing, and passes a random `slice` URL parameter on every search query (e.g. `/_search?slice=4821`).
+ - `slice-random-seed` (default: 42): Base random seed for `slice` assignment during bulk indexing; each bulk indexing client uses `slice-random-seed + client_index`.
+ - `search_slice_id` (optional): When set, every search uses this fixed slice id instead of a random slice. Used by `single-slice-search-throughput-ramp`.
 
 For running with Base64 encoded strings, use a parameter file like:
 
@@ -186,6 +187,40 @@ When `as_ingest_target_throughputs` is a positive number, the ingest throughput 
 
 When `as_search_target_throughputs` is a positive number, the search throughput formula in documents per second is `search_size * as_search_target_throughputs`.
 
+### Parameters for single-slice-search-throughput-ramp challenge
+
+Search-only benchmark against a **pre-loaded** `msmarco-v2` index. Every query targets **one fixed slice** (`?slice=<search_slice_id>`) instead of a random slice. Throughput ramps in phases so you can observe latency and serverless autoscaling under increasing load.
+
+- **No indexing** — the challenge never deletes, creates, or ingests data. The index must already exist (for example after `index-and-search` with `slice_enabled: true`).
+- **Fixed slice** — set `search_slice_id` (default: `0`). Documents indexed with random slices `0..9999` are spread across slices; pick any slice id to query a ~1/10000 subset of the corpus.
+- **Throughput ramp** — default phases run at 100, 200, …, 5000 queries/s (50 phases). Override with `search_target_throughputs` (or `as_search_target_throughputs`).
+- **Clients** — defaults to `max(target_throughput, min_search_clients)` per phase so Rally can sustain the requested rate. Override with `as_search_clients` if needed (for example cap clients at 1000 on smaller load drivers).
+- **Timing** — default `as_warmup_time_periods: [60]`, `as_time_periods: [300]` (5 minutes measured per phase → ~5 hours total for the default 50-phase ramp).
+- **Query shape** — single KNN query per phase (`search_k`, `search_num_candidates`, `search_visit_percentage`, `search_oversample_rescore`; defaults match the k=10 autoscale task for `bbq_disk`).
+
+Example esbench params for project `e386f0fb0f574aa09cd001f63355b0b3` with node-stats telemetry for scaling observation:
+
+```json
+{
+  "track.challenge": "single-slice-search-throughput-ramp",
+  "track.params": {
+    "slice_enabled": true,
+    "search_slice_id": 4821,
+    "vector_index_type": "bbq_disk",
+    "search_target_throughputs": [100, 200, 500, 1000, 2000, 3000, 4000, 5000],
+    "as_time_periods": [600],
+    "min_search_clients": 16
+  },
+  "stats.telemetry": ["node-stats"],
+  "stats.telemetry.params": {
+    "node-stats-include-indices": true,
+    "node-stats-sample-interval": 10
+  }
+}
+```
+
+For a quick smoke test before the full ramp, use a short `search_target_throughputs` array and shorter `as_time_periods`.
+
 ### Parameters for ingest-search-autoscale challenge
 
 - Mapping:
@@ -212,7 +247,7 @@ When `as_search_target_throughputs` is a positive number, the search throughput 
 
 Initial ingest, wait for merges to settle, then run a single parallel phase that updates a percentage of the corpus (by re-indexing documents with the same `_id` from the same corpus) at a target docs/s while running queries. The search task runs until the update task completes (via `completed-by`).
 
-Both bulk tasks use the `bulk-copy-docid-param-source` from `track.py`, which copies each document's `docid` field into the bulk action line as `_id`. When `slice_enabled` is true, a random `_slice` value is also added to each bulk action line. The corpus is not rewritten — the `docid` value is left in place as a field and also used as the document `_id`, so re-ingestion overwrites existing documents instead of appending new ones with fresh auto-generated `_id`s.
+Both bulk tasks use the `bulk-copy-docid-param-source` from `track.py`, which copies each document's `docid` field into the bulk action line as `_id`. When `slice_enabled` is true, a random `slice` value is also added to each bulk action line. The corpus is not rewritten — the `docid` value is left in place as a field and also used as the document `_id`, so re-ingestion overwrites existing documents instead of appending new ones with fresh auto-generated `_id`s.
 
 - Mapping:
     - `vector_index_type` (default: bbq_hnsw)

@@ -87,12 +87,56 @@ def render_search(params=None):
     return render("search-autoscale-schedule.json", base)
 
 
+def render_single_slice_search(params=None):
+    return render("single-slice-search-throughput-ramp.json", params or {})
+
+
 def render_ingest_search(params=None):
     return render("ingest-search-autoscale-schedule.json", params or {})
 
 
 def render_ingest(params=None):
     return render("ingest-autoscale-schedule.json", params or {})
+
+
+# --- single-slice-search-throughput-ramp.json ---
+
+
+class TestSingleSliceSearchThroughputRamp:
+    def test_default_fifty_phases_from_100_to_5000(self):
+        steps = render_single_slice_search()
+        # health check + 50 throughput phases
+        assert len(steps) == 51
+        search_steps = [s for s in steps if s["name"].startswith("search-slice")]
+        assert len(search_steps) == 50
+        assert search_steps[0]["target-throughput"] == 100
+        assert search_steps[-1]["target-throughput"] == 5000
+
+    def test_no_initial_indexing_steps(self):
+        steps = render_single_slice_search()
+        assert all(s.get("operation") != "delete-index" for s in steps)
+
+    def test_fixed_slice_on_every_search(self):
+        steps = render_single_slice_search({"search_slice_id": 4821, "search_target_throughputs": [100, 200]})
+        search_steps = [s for s in steps if s["name"].startswith("search-slice4821")]
+        assert len(search_steps) == 2
+        assert all(s["operation"]["search_slice_id"] == 4821 for s in search_steps)
+
+    def test_clients_default_to_throughput(self):
+        steps = render_single_slice_search({"search_target_throughputs": [100, 500]})
+        search_steps = [s for s in steps if s["name"].startswith("search-slice")]
+        assert search_steps[0]["clients"] == 100
+        assert search_steps[1]["clients"] == 500
+
+    def test_clients_respect_min_search_clients(self):
+        steps = render_single_slice_search({"search_target_throughputs": [50], "min_search_clients": 64})
+        search_steps = [s for s in steps if s["name"].startswith("search-slice")]
+        assert search_steps[0]["clients"] == 64
+
+    def test_custom_throughput_array(self):
+        steps = render_single_slice_search({"search_target_throughputs": [100, 500, 1000]})
+        search_steps = [s for s in steps if s["name"].startswith("search-slice")]
+        assert [s["target-throughput"] for s in search_steps] == [100, 500, 1000]
 
 
 # --- search-autoscale-schedule.json ---

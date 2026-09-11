@@ -162,6 +162,14 @@
   ]
 },
 {
+  "name": "single-slice-search-throughput-ramp",
+  "description": "Search-only throughput ramp against a pre-loaded index, targeting one fixed slice per query",
+  "default": false,
+  "schedule": [
+    {{ rally.collect(parts="common/single-slice-search-throughput-ramp.json") }}
+  ]
+},
+{
   "name": "ingest-search-autoscale",
   "description": "Benchmark concurrent queries and bulk indexing with configurable scaling steps",
   "default": false,

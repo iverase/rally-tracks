@@ -28,11 +28,13 @@ def slice_enabled(params) -> bool:
 def random_slice_request_params(params) -> dict[str, str]:
     if not slice_enabled(params):
         return {}
-    return {"_slice": str(random.randint(0, SLICE_MAX))}
+    if "search_slice_id" in params:
+        return {"slice": str(params["search_slice_id"])}
+    return {"slice": str(random.randint(0, SLICE_MAX))}
 
 
 class BulkSliceParamSource:
-    # Wraps Rally's standard bulk param source and adds a random `_slice` value
+    # Wraps Rally's standard bulk param source and adds a random `slice` value
     # (string from "0" to "9999") to each bulk action line. Required when
     # index.slice.enabled is true.
 
@@ -88,7 +90,7 @@ class _SliceRewritingPartition:
             i += 2
             action = json.loads(line)
             verb = next(iter(action))
-            action[verb]["_slice"] = str(self._rng.randint(0, SLICE_MAX))
+            action[verb]["slice"] = str(self._rng.randint(0, SLICE_MAX))
             out.append(json.dumps(action, separators=(",", ":")).encode("utf-8"))
             out.append(doc_line)
         out.append(b"")
@@ -506,6 +508,7 @@ class BulkCopyDocIdParamSource:
 
     def __init__(self, track, params, **kwargs):
         self._inner = BulkIndexParamSource(track, params, **kwargs)
+        self.corpora = self._inner.corpora
         self.infinite = self._inner.infinite
         self._params = params
         self._seed = params.get("slice-random-seed", 42)

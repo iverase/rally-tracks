@@ -1,0 +1,71 @@
+{
+  "name": "check-cluster-health-before-search",
+  "operation": "check-cluster-health"
+},
+{%- set p_vector_index_type = (vector_index_type | default("bbq_disk")) %}
+{%- if search_target_throughputs is defined %}
+{%- set p_throughputs = search_target_throughputs %}
+{%- elif as_search_target_throughputs is defined %}
+{%- set p_throughputs = as_search_target_throughputs %}
+{%- else %}
+{%- set p_throughputs = range(100, 5100, 100)|list %}
+{%- endif %}
+{%- if as_phases is defined %}
+{%- set p_as_phases = as_phases %}
+{%- elif as_warmup_time_periods is defined %}
+{%- set p_as_phases = as_warmup_time_periods|length %}
+{%- else %}
+{%- set p_as_phases = p_throughputs|length %}
+{%- endif %}
+{%- set p_as_warmup_time_periods = (as_warmup_time_periods | default([60])) %}
+{%- set p_as_time_periods = (as_time_periods | default([300])) %}
+{%- set p_as_settings = (as_settings | default([{}])) %}
+{%- set p_as_settings_retries = ([as_settings_retries | default(3) | int, 0] | max) %}
+{%- set p_search_k = (search_k | default(10) | int) %}
+{%- set p_search_num_candidates = (search_num_candidates | default(100) | int) %}
+{%- set p_search_slice_id = (search_slice_id | default(0) | int) %}
+{%- set p_min_search_clients = (min_search_clients | default(16) | int) %}
+{%- for i in range(p_as_phases) %}
+  {%- set tp = p_throughputs[i % (p_throughputs|length)] %}
+  {%- if as_search_clients is defined %}
+  {%- set p_clients = as_search_clients[i % (as_search_clients|length)] %}
+  {%- else %}
+  {%- set p_clients = [tp, p_min_search_clients] | max %}
+  {%- endif %}
+  {%- set phase_settings = p_as_settings[i % (p_as_settings|length)] %}
+  {%- if phase_settings %}
+{
+  "name": "configure-settings-{{loop.index}}",
+  "operation": {
+    "operation-type": "configure-settings",
+    "param-source": "settings-param-source",
+    "settings": {{phase_settings | tojson}},
+    "retries": {{p_as_settings_retries}}
+  }
+},
+  {%- endif %}
+{
+  "name": "search-slice{{p_search_slice_id}}-t{{tp}}-c{{p_clients}}",
+  "clients": {{p_clients}},
+  "operation": {
+    "operation-type": "search",
+    "param-source": "knn-param-source",
+    "random-query": true,
+    "dims": 1024,
+    "k": {{p_search_k}},
+    "num-candidates": {{p_search_num_candidates}},
+    "search_slice_id": {{p_search_slice_id}},
+    "slice_enabled": {{slice_enabled | default(true) | tojson}},
+    {%- if p_vector_index_type == "bbq_hnsw" %}
+    "oversample-rescore": {{search_oversample_rescore | default(3) | int}},
+    {%- elif p_vector_index_type == "bbq_disk" %}
+    "oversample-rescore": {{search_oversample_rescore | default(5) | int}},
+    "visit-percentage": {{search_visit_percentage | default(2) | int}},
+    {%- endif %}
+    "looped": true
+  },
+  "warmup-time-period": {{[p_as_warmup_time_periods[i % (p_as_warmup_time_periods|length)], 1]|max}},
+  "time-period": {{p_as_time_periods[i % (p_as_time_periods|length)]}},
+  "target-throughput": {{tp}}
+}{%- if not loop.last %},{%- endif %}
+{%- endfor %}
