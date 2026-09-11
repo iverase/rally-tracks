@@ -12,8 +12,6 @@
 {%- endif %}
 {%- if as_phases is defined %}
 {%- set p_as_phases = as_phases %}
-{%- elif as_warmup_time_periods is defined %}
-{%- set p_as_phases = as_warmup_time_periods|length %}
 {%- else %}
 {%- set p_as_phases = p_throughputs|length %}
 {%- endif %}
