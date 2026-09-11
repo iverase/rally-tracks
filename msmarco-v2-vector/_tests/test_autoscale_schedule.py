@@ -138,6 +138,16 @@ class TestSingleSliceSearchThroughputRamp:
         search_steps = [s for s in steps if s["name"].startswith("search-slice")]
         assert [s["target-throughput"] for s in search_steps] == [100, 500, 1000]
 
+    def test_warmup_array_does_not_reduce_phase_count(self):
+        steps = render_single_slice_search(
+            {
+                "search_target_throughputs": [100, 200, 500],
+                "as_warmup_time_periods": [30],
+            }
+        )
+        search_steps = [s for s in steps if s["name"].startswith("search-slice")]
+        assert len(search_steps) == 3
+
 
 # --- search-autoscale-schedule.json ---
 
